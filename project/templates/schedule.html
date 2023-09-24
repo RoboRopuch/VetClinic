@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<body>
+
+<div class="doctor-drop-container">
+    <form action="{{ url_for('get_schedule') }}" method="POST">
+        <label> Tygodniowy grafik pracownika:
+            <select name="doctor_dropdown" required class="custom-dropdown" onchange="this.form.submit()">
+                <option value="" selected disabled hidden>Wybierz lekarza</option>
+                {% for doctor in doctors %}
+                    <option value="{{ doctor['employee_id'] }}">{{ 'dr. ' + doctor['name'] + ' ' + doctor['surname'] + ' (' + doctor['spec'] + ')'  }}</option>
+                {% endfor %}
+            </select>
+        </label>
+    </form>
+</div>
+
+<div id='calendar'></div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const calendarEl = document.getElementById('calendar');
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+            allDaySlot: false,
+            locale: 'pl',
+            initialView: 'timeGridWeek',
+            headerToolbar: {
+                left: 'prev,next',
+                center: 'title',
+                right: 'timeGridWeek,timeGridDay',
+            },
+            contentHeight: 'auto',
+            events: {{ events | tojson }},
+            hiddenDays: [0],
+            buttonText: {
+                week: 'Tydzień',
+                day: 'Dzień',
+            },
+            slotMinTime: '09:00',
+            slotMaxTime: '19:00',
+        });
+
+        calendar.render();
+    });
+</script>
+
+
+
+{% endblock %}

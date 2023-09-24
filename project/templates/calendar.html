@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+
+<div id="custom-dialog" style="display: none;">
+    <div class="title">Custom Title</div>
+    <div class="content">Dialog content goes here.</div>
+    <button onclick="closeDialog()" style="position: absolute; top: 0; right: 0;">❌</button>
+</div>
+
+<script>
+
+
+    function showDialog(title, message) {
+    var dialog = document.getElementById('custom-dialog');
+    var titleElement = dialog.querySelector('.title');
+    var contentElement = dialog.querySelector('.content');
+
+    titleElement.textContent = title;
+    contentElement.textContent = message;
+
+    dialog.style.display = 'block';
+    }
+
+    function closeDialog() {
+    var dialog = document.getElementById('custom-dialog');
+    dialog.style.display = 'none';
+    }
+
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            eventClick: function(info) {
+            var eventObj = info.event;
+
+            if (eventObj.url) {
+                showDialog(
+                'Custom Title',
+                'Clicked ' + eventObj.title + '.\n' +
+                'Will open ' + eventObj.url + ' in a new tab'
+                );
+
+                window.open(eventObj.url);
+
+                info.jsEvent.preventDefault(); // prevents the browser from following the link in the current tab
+            } else {
+                showDialog('Informacje o wizycie', eventObj.title);
+            }
+            },
+
+            allDaySlot: false,
+            locale: 'pl',
+            initialView: 'timeGridWeek',
+            headerToolbar: {
+                left: 'prev,next,today',
+                center: 'title',
+                right: 'timeGridWeek,timeGridDay,dayGridMonth',
+                
+            },
+            contentHeight: 'auto',
+            events: {
+                url : '/send_appointments',
+                method : 'GET',
+ 
+                },
+            hiddenDays: [0],
+            buttonText: {
+                today: 'Dziś',
+                month: 'Miesiąc',
+                week: 'Tydzień',
+                day: 'Dzień',
+            },
+            slotMinTime: '09:00',
+            slotMaxTime: '19:00',
+            slotDuration: '00:15:00',
+        });
+        
+        calendar.render();
+    });
+</script>
+ 
+
+<div id='calendar'></div>
+
+<div class="container">
+
+    <div class='container'>
+        <h1>Zarządzaj wizytami</h1>
+        <div class="row search-add">
+            <input type="text" id="pesel" onkeyup="searchFunction()" placeholder="Wpisz imię właściciela lub nazwę zwierzęcia...">
+            <div class="add-user">
+                <button class="btn btn-success btn-block button-personalized" type="button" data-toggle="modal" data-target="#add-appointment-form">Dodaj wizytę</button>
+            </div>
+        </div>
+    
+        <div class="row flex-lg-nowrap">
+            <table id="appointments">
+            <caption>Tabela umówionych wizyt</caption>
+                <thead>
+                    <tr>
+                        <th>Id</th>
+                        <th>Data</th>
+                        <th>Godzina</th>
+                        <th>Pokój</th>
+                        <th>Lekarz</th>
+                        <th>Zwierzę</th>
+                        <th>Zabieg</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for appointment in appointments %}
+                        <tr class='clickable-row' data-href="/patients/{{ appointment.id}}">
+                            <td class="linked" onclick="window.location='/patients/{{ appointment.owner_id }}'">{{ appointment.id }}</td>
+                            <td class="linked" onclick="window.location='/patients/{{ appointment.owner_id }}'">{{ appointment.date.strftime('%Y-%m-%d') }}</td>
+                            <td class="linked" onclick="window.location='/patients/{{ appointment.owner_id }}'">{{ appointment.time.strftime('%H:%M') }}</td>
+                            <td class="linked" onclick="window.location='/patients/{{ appointment.owner_id }}'">{{ appointment.room }}</td>
+                            <td class="linked" onclick="window.location='/patients/{{ appointment.owner_id }}'">{{ appointment.doctor }}</td>
+                            <td class="linked" onclick="window.location='/patients/{{ appointment.owner_id }}'">{{ appointment.animal }}</td>
+                            <td class="linked" onclick="window.location='/patients/{{ appointment.owner_id }}'">{{ appointment.procedures }}</td>
+                            <td class="text-center align-middle">
+                                <div class="btn-group align-top">
+                                    <button class="btn btn-sm btn-outline-secondary badge edit-btn" type="button" data-toggle="modal"
+                                            data-target="#change-time-form" data-appointment-id="{{ appointment.id }}"
+                                            data-new-day="{{ appointment.date.strftime('%Y-%m-%d') }}" data-start-hour="{{ appointment.time.strftime('%H:%M') }}">Przełóż</button>
+                                    <button class="btn btn-sm btn-outline-secondary badge delete-btn" type="button" data-toggle="modal" data-target="#confirmation" appointment_id="{{ appointment.id }}">
+                                        <img class="trashy" src="../static/css/trash.png" alt="trash icon" width="25" height="25">
+                                    </button>
+                                    
+                                </div>
+                              </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    
+    <!-- add appointment form -->
+    <div class="modal fade" role="dialog" tabindex="-1" id="add-appointment-form"> 
+          <div class="py-1">       
+            <div class="modal-dialog modal-lg" role="document">
+                <div class = 'modal-content'>
+                    <div class="modal-header">
+                        <h5>Dodaj wizytę </h5>
+                        <button type="button" class="close" data-dismiss="modal">
+                            <span aria-hidden="true">×</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                    <form class="form" action="/add_appointment" method="POST">
+                        <label for="date">Data:</label>
+                        <input type="date" name="date" required>
+                        <label for="time">Godzina:</label>
+                        <input type="time" name="time" required>
+                        <div class="form-group">
+                            <label for="doctor">Wybierz lekarza:</label>
+                            <select name="doctor" required class="custom-dropdown">
+                                {% for doctor in doctors %}
+                                    <option value="{{ doctor['vet_id'] }}">{{doctor['name'] + ' ' + doctor['surname'] + ' (' + doctor['spec'] + ')' }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="room">Wybierz pokój przyjęcia:</label>
+                            <select name="room" required class="custom-dropdown">
+                                {% for room in rooms %}
+                                    <option value="{{ room['room_id'] }}">{{ room['room_number'] + ' (' + room['type'] + ')' }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                                <label for="animal">Wybierz pacjenta:</label>
+                                <select name="animal" required class="custom-dropdown">
+                                    {% for animal in animals %}
+                                        <option value="{{ animal['animal_id'] }}">{{ animal['species'] + ' ' + animal['name'] + ' (' + animal['owner_name'] + ' ' + animal['owner_surname'] + ')' }}</option>
+                                    {% endfor %}
+                                </select>
+                        
+                        </div>
+                        <div class="form-group">
+                            <label for="treatments">Wybierz zabiegi:</label>
+                            <div class="row">
+                                {% for procedure in procedures %}
+                                    <div class="col-4">
+                                        <div class="checkbox">
+                                            <input type="checkbox" id="procedure{{ procedure['procedure_id'] }}" name="treatments" value="{{ procedure['procedure_id']}}">
+                                            {{ procedure['name'] }}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                          
+                        <button class="btn btn-success btn-block" onclick="editRow();" type="submit">Potwierdź</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<!-- edit time of appointment form -->
+<div class="modal fade" role="dialog" tabindex="-1" id="change-time-form">
+    <div class="py-1">
+      <div class="modal-dialog modal-lg" role="document">
+          <div class = 'modal-content'>
+              <div class="modal-header">
+                  <h5>Edytuj czas wizyty</h5>
+                  <button type="button" class="close" data-dismiss="modal">
+                      <span aria-hidden="true">×</span>
+                  </button>
+              </div>
+              <div class="modal-body">
+                <form class="form" id="edit-form" action="/postpone_appointment/{{ appointment_id }}" method="POST">
+                  <div class="form-group">
+                    <label for="new_day">Nowy dzień wizyty:</label>
+                    <input type="date" name="new_day" id="new_day" required placeholder="...">
+                  </div>
+                  <div class="form-group">
+                      <label for="start_hour">Nowa godzina rozpoczęcia wizyty:</label>
+                      <input type="time" name="start_hour" id="start_hour" required placeholder="...">
+                  </div>
+
+                  <button class="btn btn-success btn-block" type="submit" id="submit-edit">Przełóż</button>
+                </form>
+              </div>
+          </div>
+      </div>
+  </div>
+</div>
+
+
+<!-- confirmation window -->
+<div class="modal fade" role="dialog" tabindex="0" id="confirmation" action="">
+    <div class="py-1">
+        <div class="modal-dialog modal-lg">
+            <div class = 'modal-content'>
+                <div class="modal-header">
+                    <h5>Czy na pewno chcesz usunąć wizytę?</h5>
+                </div>
+                <div class="modal-body">
+                    <form class="form" novalidate="" id="delete-form" method="POST" action="/delete_appointment/{{ appointment_id }}">
+                    <div class="col text-center">
+                        <button class="button-personalized btn btn-block btn-outline-secondary" type="submit">Potwierdź</button>
+                        <button class="button-personalized btn btn-block btn-success" type="button" data-dismiss="modal">Anuluj</button>
+                    </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const deleteButtons = document.querySelectorAll('.delete-btn');
+        const deleteForm = document.getElementById('delete-form');
+
+        deleteButtons.forEach(function(button) {
+            button.addEventListener('click', function() {
+                const appointmentId = button.getAttribute('appointment_id');
+                const action = '/delete_appointment/' + appointmentId;
+                deleteForm.setAttribute('action', action);
+            });
+        });
+    });
+</script>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const editButtons = document.querySelectorAll('.edit-btn');
+        const editForm = document.getElementById('edit-form');
+        const newDayInput = document.getElementById('new_day');
+        const startHourInput = document.getElementById('start_hour');
+
+        editButtons.forEach(function(button) {
+            button.addEventListener('click', function() {
+                const appointmentId = button.getAttribute('data-appointment-id');
+                const newDay = button.getAttribute('data-new-day');
+                const startHour = button.getAttribute('data-start-hour');
+
+                // Ustawiamy wartości pól formularza na podstawie danych z wiersza tabeli
+                newDayInput.value = newDay;
+                startHourInput.value = startHour;
+                const action = '/postpone_appointment/' + appointmentId;
+                editForm.setAttribute('action', action);
+            });
+        });
+    });
+</script>
+
+<script>
+    function searchFunction() {
+      var input, filter, table, tr, td, i, txtValue;
+      input = document.getElementById("pesel");
+      filter = input.value.toString().toLowerCase();
+      table = document.getElementById("appointments");
+      tr = table.getElementsByTagName("tr");
+
+      // Loop through all table rows, and hide those that don't match the search query
+      for (i = 0; i < tr.length; i++) {
+        td = tr[i].getElementsByTagName("td")[5]; // Use index 5 for the "animal" column
+        if (td) {
+          txtValue = td.textContent || td.innerText;
+          if (txtValue.toString().toLowerCase().includes(filter)) {
+            tr[i].style.display = "";
+          } else {
+            tr[i].style.display = "none";
+          }
+        }
+      }
+    }
+</script>
+
+{% endblock %}
